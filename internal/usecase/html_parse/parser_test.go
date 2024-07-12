@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// Написал тесты
 func TestGetNamesLeaders(t *testing.T) {
 	tCase := []struct {
 		name        string
