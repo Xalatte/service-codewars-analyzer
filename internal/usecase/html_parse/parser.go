@@ -7,47 +7,75 @@ import (
 	"strings"
 )
 
+const (
+	kataURL     = "https://www.codewars.com/users/leaderboard/kata"
+	authoredURL = "https://www.codewars.com/users/leaderboard/authored"
+	ranksURL    = "https://www.codewars.com/users/leaderboard/ranks"
+	leadersURL  = "https://www.codewars.com/users/leaderboard"
+)
+
 type Parser struct {
+	urls  []string
+	Names []string
 }
 
 func New() *Parser {
-	return &Parser{}
+	constants := []string{kataURL, authoredURL, ranksURL, leadersURL}
+	p := &Parser{urls: constants}
+	ch := make(chan []string)
+
+	// Используем множество для хранения уникальных ников
+	namesSet := make(map[string]struct{})
+
+	for _, url := range constants {
+		go func(url string) {
+			names, err := p.getNamesLeaders(context.Background(), url)
+			if err != nil {
+				fmt.Printf("Error fetching names from %s: %v\n", url, err)
+				ch <- nil
+				return
+			}
+			ch <- names
+		}(url)
+	}
+
+	for range constants {
+		names := <-ch
+		if names != nil {
+			for _, name := range names {
+				if _, exists := namesSet[name]; !exists {
+					namesSet[name] = struct{}{}
+					p.Names = append(p.Names, name)
+				}
+			}
+		}
+	}
+
+	fmt.Println("All URLs processed")
+	return p
 }
 
-// GetNamesLeaders возращает список уникальных ников из таблиц лидеров
-func (p Parser) GetNamesLeaders(ctx context.Context) ([]string, error) {
+func (p Parser) getNamesLeaders(_ context.Context, url string) ([]string, error) {
 	c := colly.NewCollector()
 
-	names := make(map[string]bool)
+	namesSet := make(map[string]struct{})
 
 	c.OnHTML("a", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
 		parts := strings.Split(href, "/")
-		if len(parts) > 2 {
-			names[parts[2]] = true
+		if len(parts) > 2 && parts[1] == "users" {
+			namesSet[parts[2]] = struct{}{}
 		}
 	})
 
-	c.Visit("https://www.codewars.com/users/leaderboard")
-
-	c.Wait()
-
-	result := make([]string, 0, len(names))
-	for name := range names {
-		result = append(result, name)
+	if err := c.Visit(url); err != nil {
+		return nil, fmt.Errorf("c.Visit: %w", err)
 	}
 
-	return result, nil
-}
+	names := make([]string, 0, len(namesSet))
+	for name := range namesSet {
+		names = append(names, name)
+	}
 
-func main() {
-	parser := New()
-	names, err := parser.GetNamesLeaders(context.Background())
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	for _, name := range names {
-		fmt.Println(name)
-	}
+	return names, nil
 }
