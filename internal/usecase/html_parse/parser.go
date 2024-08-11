@@ -4,78 +4,74 @@ import (
 	"context"
 	"fmt"
 	"github.com/gocolly/colly"
+	"golang.org/x/sync/errgroup"
 	"strings"
+	"sync"
 )
 
 const (
-	kataURL     = "https://www.codewars.com/users/leaderboard/kata"
-	authoredURL = "https://www.codewars.com/users/leaderboard/authored"
-	ranksURL    = "https://www.codewars.com/users/leaderboard/ranks"
-	leadersURL  = "https://www.codewars.com/users/leaderboard"
+	KataURL     = "https://www.codewars.com/users/leaderboard/kata"
+	AuthoredURL = "https://www.codewars.com/users/leaderboard/authored"
+	RanksURL    = "https://www.codewars.com/users/leaderboard/ranks"
+	LeadersURL  = "https://www.codewars.com/users/leaderboard"
 )
 
 type Parser struct {
-	urls  []string
-	Names []string
+	urls []string
 }
 
-func New() *Parser {
-	constants := []string{kataURL, authoredURL, ranksURL, leadersURL}
-	p := &Parser{urls: constants}
-	ch := make(chan []string)
+func New(urls []string) *Parser {
+	return &Parser{
+		urls: urls,
+	}
+}
 
-	// Используем множество для хранения уникальных ников
-	namesSet := make(map[string]struct{})
+func (p *Parser) GetUniqueLeadersNames(ctx context.Context) ([]string, error) {
+	errGroup, grCtx := errgroup.WithContext(ctx)
+	var mut sync.Mutex
 
-	for _, url := range constants {
-		go func(url string) {
-			names, err := p.getNamesLeaders(context.Background(), url)
+	namesMap := map[string]struct{}{}
+
+	for _, url := range p.urls {
+		errGroup.Go(func() error {
+			names, err := p.getNamesLeaders(grCtx, url)
 			if err != nil {
-				fmt.Printf("Error fetching names from %s: %v\n", url, err)
-				ch <- nil
-				return
+				return fmt.Errorf("p.getNamesLeaders: %w", err)
 			}
-			ch <- names
-		}(url)
-	}
-
-	for range constants {
-		names := <-ch
-		if names != nil {
+			mut.Lock()
 			for _, name := range names {
-				if _, exists := namesSet[name]; !exists {
-					namesSet[name] = struct{}{}
-					p.Names = append(p.Names, name)
-				}
+				namesMap[name] = struct{}{}
 			}
-		}
+			mut.Unlock()
+			return nil
+		})
 	}
 
-	fmt.Println("All URLs processed")
-	return p
+	if err := errGroup.Wait(); err != nil {
+		return nil, fmt.Errorf("failed get names: %w", err)
+	}
+
+	result := make([]string, 0, len(namesMap))
+	for name, _ := range namesMap {
+		result = append(result, name)
+	}
+	return result, nil
 }
 
-func (p Parser) getNamesLeaders(_ context.Context, url string) ([]string, error) {
+func (p *Parser) getNamesLeaders(_ context.Context, url string) ([]string, error) {
 	c := colly.NewCollector()
-
-	namesSet := make(map[string]struct{})
+	names := make([]string, 0)
 
 	c.OnHTML("a", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
 		parts := strings.Split(href, "/")
 		if len(parts) > 2 && parts[1] == "users" {
-			namesSet[parts[2]] = struct{}{}
+			names = append(names, parts[2])
 		}
 	})
 
 	if err := c.Visit(url); err != nil {
 		return nil, fmt.Errorf("c.Visit: %w", err)
 	}
-
-	names := make([]string, 0, len(namesSet))
-	for name := range namesSet {
-		names = append(names, name)
-	}
-
 	return names, nil
 }
