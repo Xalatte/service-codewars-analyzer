@@ -3,24 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Xalatte/service-codewars-analyzer.git/internal/usecase/html_parse"
+	"github.com/Xalatte/service-codewars-analyzer.git/internal/usecase/leaderboards_names"
 	"log"
-	"time"
 )
 
 func main() {
 	ctx := context.Background()
-	parser := html_parse.New([]string{
-		html_parse.KataURL,
-		html_parse.LeadersURL,
-		html_parse.AuthoredURL,
-		html_parse.RanksURL,
+	parser := leaderboards_names.New([]string{
+		leaderboards_names.KataURL,
+		leaderboards_names.LeadersURL,
+		leaderboards_names.AuthoredURL,
+		leaderboards_names.RanksURL,
 	})
 
-	startTime := time.Now()
-	_, err := parser.GetUniqueLeadersNames(ctx)
+	names, err := parser.GetUniqueLeadersNames(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(time.Since(startTime).String())
+	fmt.Println(names)
 }
