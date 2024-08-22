@@ -1,4 +1,4 @@
-package html_parse
+package leaderboards_names
 
 import (
 	"context"
@@ -36,4 +36,3 @@ func TestNoDuplicateNames_ReturnError(t *testing.T) {
 	_, err := p.GetUniqueLeadersNames(ctx)
 	require.Error(t, err)
 }
-

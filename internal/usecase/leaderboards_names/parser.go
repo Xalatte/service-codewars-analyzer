@@ -1,4 +1,4 @@
-package html_parse
+package leaderboards_names
 
 import (
 	"context"
@@ -75,4 +75,3 @@ func (p *Parser) getNamesLeaders(_ context.Context, url string) ([]string, error
 	}
 	return names, nil
 }
-
