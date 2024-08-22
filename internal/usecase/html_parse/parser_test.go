@@ -36,3 +36,4 @@ func TestNoDuplicateNames_ReturnError(t *testing.T) {
 	_, err := p.GetUniqueLeadersNames(ctx)
 	require.Error(t, err)
 }
+

@@ -75,3 +75,4 @@ func (p *Parser) getNamesLeaders(_ context.Context, url string) ([]string, error
 	}
 	return names, nil
 }
+
